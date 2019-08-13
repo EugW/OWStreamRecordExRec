@@ -27,9 +27,9 @@ struct OWStreamRecordExRec_data {
 	HANDLE                         mutex;
 };
 
-const char *destination= "OWStreamRecordExRec:SHMEM";
+const char *shmem_name = "OWStreamRecordExRec:SHMEM";
 
-void WINAPI MyThread(struct OWStreamRecordExRec_data *data) {
+void WINAPI UploadThread(struct OWStreamRecordExRec_data *data) {
     if (data->shmem) {
         auto *buf = (uint32_t *) MapViewOfFile(
                 data->shmem,
@@ -121,10 +121,10 @@ void OWStreamRecordExRec_tick(struct OWStreamRecordExRec_data *filter, float t) 
 		filter->capture = false;
 		filter->since_last = 0.0f;
 	}
-	if (destination) {
+	if (shmem_name) {
 		if (update) {
 			if (filter->shmem) {
-				info("Closing shmem \"%s\": %x", destination, filter->shmem);
+				info("Closing shmem \"%s\": %x", shmem_name, filter->shmem);
 				CloseHandle(filter->shmem);
 			}
 			filter->shmem_size = 12 + (width + 32) * height * 4;
@@ -134,9 +134,9 @@ void OWStreamRecordExRec_tick(struct OWStreamRecordExRec_data *filter, float t) 
                     PAGE_READWRITE,
                     0,
                     filter->shmem_size,
-                    destination
+                    shmem_name
 			);
-			info("Created shmem \"%s\": %x", destination, filter->shmem);
+			info("Created shmem \"%s\": %x", shmem_name, filter->shmem);
 		}
 	}
 	filter->since_last += t;
@@ -179,7 +179,7 @@ void OWStreamRecordExRec_render(struct OWStreamRecordExRec_data *filter, gs_effe
 		uint32_t linesize;
 		WaitForSingleObject(filter->mutex, INFINITE);
 		if (gs_stagesurface_map((gs_stagesurf_t *) filter->staging_texture, &data1, &linesize)) {
-		    CreateThread(nullptr, 0, reinterpret_cast<LPTHREAD_START_ROUTINE>(MyThread), data1, 0, nullptr);
+            CreateThread(nullptr, 0, reinterpret_cast<LPTHREAD_START_ROUTINE>(UploadThread), data1, 0, nullptr);
             gs_stagesurface_unmap((gs_stagesurf_t *) filter->staging_texture);
         }
 		filter->capture = false;
