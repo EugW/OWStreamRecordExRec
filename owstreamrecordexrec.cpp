@@ -29,27 +29,27 @@ struct OWStreamRecordExRec_data {
 
 const char *shmem_name = "OWStreamRecordExRec:SHMEM";
 
-void WINAPI UploadThread(struct OWStreamRecordExRec_data *data) {
-    if (data->shmem) {
+void UploadThread(struct OWStreamRecordExRec_data *filter) {
+    if (filter->shmem) {
         auto *buf = (uint32_t *) MapViewOfFile(
-                data->shmem,
+                filter->shmem,
                 FILE_MAP_ALL_ACCESS,
                 0,
                 0,
-                data->shmem_size
+                filter->shmem_size
         );
         if (buf) {
-            buf[0] = data->width;
-            buf[1] = data->height;
-            buf[2] = data->linesize;
-            buf[3] = data->index;
-            memcpy(&buf[4], data->data, data->linesize * data->height);
+            buf[0] = filter->width;
+            buf[1] = filter->height;
+            buf[2] = filter->linesize;
+            buf[3] = filter->index;
+            memcpy(&buf[4], filter->data, filter->linesize * filter->height);
         }
         UnmapViewOfFile(buf);
     }
 }
 
-static void *OWStreamRecordExRec_create(obs_data_t *settings, obs_source_t *context) {
+void *OWStreamRecordExRec_create(obs_data_t *settings, obs_source_t *context) {
 	auto *filter = reinterpret_cast<OWStreamRecordExRec_data *>(bzalloc(sizeof(struct OWStreamRecordExRec_data)));
 	filter->context = context;
 	obs_enter_graphics();
@@ -61,7 +61,7 @@ static void *OWStreamRecordExRec_create(obs_data_t *settings, obs_source_t *cont
 	return filter;
 }
 
-static void OWStreamRecordExRec_destroy(struct OWStreamRecordExRec_data *filter) {
+void OWStreamRecordExRec_destroy(struct OWStreamRecordExRec_data *filter) {
 	WaitForSingleObject(filter->mutex, INFINITE);
 	obs_enter_graphics();
 	gs_texrender_destroy(filter->texrender);
@@ -175,11 +175,10 @@ void OWStreamRecordExRec_render(struct OWStreamRecordExRec_data *filter, gs_effe
 	gs_texture_t *tex = gs_texrender_get_texture(filter->texrender);
 	if (tex) {
 		gs_stage_texture((gs_stagesurf_t *) filter->staging_texture, tex);
-		uint8_t *data1;
 		uint32_t linesize;
 		WaitForSingleObject(filter->mutex, INFINITE);
-		if (gs_stagesurface_map((gs_stagesurf_t *) filter->staging_texture, &data1, &linesize)) {
-            CreateThread(nullptr, 0, reinterpret_cast<LPTHREAD_START_ROUTINE>(UploadThread), data1, 0, nullptr);
+		if (gs_stagesurface_map((gs_stagesurf_t *) filter->staging_texture, &filter->data, &linesize)) {
+            CreateThread(nullptr, 0, reinterpret_cast<LPTHREAD_START_ROUTINE>(UploadThread), filter, 0, nullptr);
             gs_stagesurface_unmap((gs_stagesurf_t *) filter->staging_texture);
         }
 		filter->capture = false;
