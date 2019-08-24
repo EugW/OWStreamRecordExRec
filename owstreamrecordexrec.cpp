@@ -21,13 +21,25 @@ struct OWStreamRecordExRec_data {
     gs_stagesurf_t *staging_texture;
     uint8_t *data;
     uint32_t linesize;
-    uint32_t index;
     uint32_t shmem_size;
     HANDLE shmem;
     HANDLE mutex;
 };
 
 const char *shmem_name = "OWStreamRecordExRec:SHMEM";
+
+void removeLS(const uint8_t * src, uint8_t * dest, int w, int h, int ls) {
+    int mi = 0;
+    for (int i = 0; i < ls * h; i+=4) {
+        if (i - (i/ls)*ls < w*4) {
+            dest[mi-mi/4] = src[i+2];
+            dest[mi+1-mi/4] = src[i+1];
+            dest[mi+2-mi/4] = src[i];
+            //dest[mi+3] = src[i+3];
+            mi+=4;
+        }
+    }
+}
 
 void UploadThread(struct OWStreamRecordExRec_data *filter) {
     if (filter->shmem) {
@@ -41,9 +53,7 @@ void UploadThread(struct OWStreamRecordExRec_data *filter) {
         if (buf) {
             buf[0] = filter->width;
             buf[1] = filter->height;
-            buf[2] = filter->linesize;
-            buf[3] = filter->index;
-            memcpy(&buf[4], filter->data, filter->linesize * filter->height);
+            removeLS(filter->data, reinterpret_cast<uint8_t *>(&buf[2]), filter->width, filter->height, filter->linesize);
         }
         UnmapViewOfFile(buf);
     }
@@ -117,7 +127,7 @@ void OWStreamRecordExRec_tick(struct OWStreamRecordExRec_data *filter, float t) 
         if (filter->data) {
             bfree(filter->data);
         }
-        filter->data = reinterpret_cast<uint8_t *>(bzalloc((width + 32) * height * 4));
+        filter->data = reinterpret_cast<uint8_t *>(bzalloc(width * height * 3));
         filter->capture = false;
         filter->since_last = 0.0f;
     }
@@ -127,7 +137,7 @@ void OWStreamRecordExRec_tick(struct OWStreamRecordExRec_data *filter, float t) 
                 info("Closing shmem \"%s\": %x", shmem_name, filter->shmem);
                 CloseHandle(filter->shmem);
             }
-            filter->shmem_size = 12 + (width + 32) * height * 4;
+            filter->shmem_size = sizeof(width) + sizeof(height) + width * height * 3;
             filter->shmem = CreateFileMapping(
                     INVALID_HANDLE_VALUE,
                     nullptr,
