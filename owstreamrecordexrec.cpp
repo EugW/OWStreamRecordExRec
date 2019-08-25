@@ -30,13 +30,12 @@ const char *shmem_name = "OWStreamRecordExRec:SHMEM";
 
 void removeLS(const uint8_t * src, uint8_t * dest, int w, int h, int ls) {
     int mi = 0;
-    for (int i = 0; i < ls * h; i+=4) {
-        if (i - (i/ls)*ls < w*4) {
-            dest[mi-mi/4] = src[i+2];
-            dest[mi+1-mi/4] = src[i+1];
-            dest[mi+2-mi/4] = src[i];
-            //dest[mi+3] = src[i+3];
-            mi+=4;
+    for (int i = 0; i < ls * h; i += 4) {
+        if (i - (i / ls) * ls < w * 4) {
+            dest[mi - mi / 4] = src[i + 2];
+            dest[mi + 1 - mi / 4] = src[i + 1];
+            dest[mi + 2 - mi / 4] = src[i];
+            mi += 4;
         }
     }
 }
@@ -53,7 +52,8 @@ void UploadThread(struct OWStreamRecordExRec_data *filter) {
         if (buf) {
             buf[0] = filter->width;
             buf[1] = filter->height;
-            removeLS(filter->data, reinterpret_cast<uint8_t *>(&buf[2]), filter->width, filter->height, filter->linesize);
+            removeLS(filter->data, reinterpret_cast<uint8_t *>(&buf[2]), filter->width, filter->height,
+                     filter->linesize);
         }
         UnmapViewOfFile(buf);
     }
